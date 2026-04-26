@@ -1,9 +1,18 @@
 // app/api/chat/history/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+
+export const dynamic = 'force-dynamic'
+import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: NextRequest) {
   try {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(request.url)
     const session_id = searchParams.get('session_id')
 
@@ -14,8 +23,8 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get chat history
-    const { data: messages, error } = await supabaseAdmin
+    // Get chat history (RLS automatically isolates to user's sessions)
+    const { data: messages, error } = await supabase
       .from('chat_messages')
       .select('role, content')
       .eq('session_id', session_id)

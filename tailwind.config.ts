@@ -27,9 +27,9 @@ const config: Config = {
         'text-muted': 'var(--text-muted)',
       },
       fontFamily: {
-        display: ['var(--font-syne)'],
-        body: ['var(--font-dm-sans)'],
-        mono: ['var(--font-jetbrains)'],
+        display: ['"Syne"', 'sans-serif'],
+        body: ['"DM Sans"', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
       }
     },
   },

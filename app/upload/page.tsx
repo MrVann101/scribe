@@ -1,6 +1,7 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { TopBar } from '@/components/layout/TopBar'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
@@ -17,6 +18,13 @@ export default function UploadPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) router.push('/login')
+    })
+  }, [router, supabase.auth])
 
   const handleFile = (f: File) => {
     if (f.type !== 'application/pdf') {

@@ -4,10 +4,16 @@ import { CreateSessionRequest } from '@/types/api'
 
 export async function GET(request: Request) {
   const supabase = createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { searchParams } = new URL(request.url)
   const source = searchParams.get('source')
 
-  let query = supabase.from('session_with_summary_status').select('*').order('created_at', { ascending: false })
+  let query = supabase.from('session_with_summary_status').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
   
   if (source === 'recording' || source === 'pdf') {
     query = query.eq('source', source)

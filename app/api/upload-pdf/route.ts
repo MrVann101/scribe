@@ -37,18 +37,19 @@ export async function POST(request: Request) {
     const sessionId = session.id
 
     const filePath = `${user.id}/${sessionId}.pdf`
-    const { error: storageError } = await adminClient.storage
+    
+    // 1. Prepare Storage Upload Promise
+    const storageUploadPromise = adminClient.storage
       .from('pdfs')
       .upload(filePath, file)
-      
-    if (storageError) throw storageError
 
+    // 2. Prepare Gemini Extraction Promise
     const arrayBuffer = await file.arrayBuffer()
     const base64PDF = Buffer.from(arrayBuffer).toString('base64')
     
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-2.5-flash'}:generateContent?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`
     
-    const geminiResponse = await fetch(geminiUrl, {
+    const geminiExtractPromise = fetch(geminiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -63,6 +64,11 @@ export async function POST(request: Request) {
       })
     })
 
+    // Execute both heavily-blocking operations in parallel
+    const [storageResult, geminiResponse] = await Promise.all([storageUploadPromise, geminiExtractPromise])
+      
+    if (storageResult.error) throw storageResult.error
+
     if (!geminiResponse.ok) {
       const errTxt = await geminiResponse.text()
       throw new Error(`Gemini PDF extract failed: ${errTxt}`)
@@ -73,8 +79,8 @@ export async function POST(request: Request) {
 
     const chunks = cleanedText.split(/(?=Topic:)/i).map((c: string) => c.trim()).filter(Boolean)
 
-    for (let i = 0; i < chunks.length; i++) {
-      let chunkText = chunks[i]
+    // Batch database inserts
+    const transcriptChunks = chunks.map((chunkText: string, i: number) => {
       let topicLabel = null
       
       const topicMatch = chunkText.match(/^Topic:\s*(.+)/i)
@@ -83,14 +89,19 @@ export async function POST(request: Request) {
         chunkText = chunkText.replace(/^Topic:\s*(.+)/i, '').trim()
       }
 
-      await adminClient.from('transcripts').insert({
+      return {
         session_id: sessionId,
         chunk_index: i,
         text: chunkText,
         is_alert: chunkText.includes('<alert>'),
         topic_label: topicLabel,
         source: 'pdf'
-      })
+      }
+    })
+
+    if (transcriptChunks.length > 0) {
+      const { error: insertError } = await adminClient.from('transcripts').insert(transcriptChunks)
+      if (insertError) throw insertError
     }
 
     await adminClient.from('sessions').update({ pdf_path: filePath, page_count: 0 }).eq('id', sessionId)

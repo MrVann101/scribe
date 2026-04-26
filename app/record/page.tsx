@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { TopBar } from '@/components/layout/TopBar'
 import { Input } from '@/components/ui/Input'
 import { MicButton } from '@/components/record/MicButton'
@@ -16,6 +17,13 @@ export default function RecordPage() {
   const [chunks, setChunks] = useState<TranscriptChunk[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const chunkIndexRef = useRef(0)
+  const supabase = createClient()
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) router.push('/login')
+    })
+  }, [router, supabase.auth])
 
   const { isRecording, isConnecting, error, startRecording, stopRecording } = useWebSpeech({
     onTranscript: (text) => {

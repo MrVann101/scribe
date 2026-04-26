@@ -56,9 +56,15 @@ export function useWebSpeech(options: UseWebSpeechOptions = {}): UseWebSpeechRet
       // Stop the stream immediately — SpeechRecognition manages its own audio
       stream.getTracks().forEach(track => track.stop())
     } catch (permErr: any) {
-      const msg = permErr.name === 'NotAllowedError'
-        ? 'Microphone access denied. Please allow microphone permission and try again.'
-        : `Microphone error: ${permErr.message}`
+      let msg = `Microphone error: ${permErr.message}`
+      if (permErr.name === 'NotAllowedError') {
+        msg = 'Microphone access denied. Please allow microphone permission and try again.'
+      } else if (permErr.name === 'NotFoundError' || permErr.name === 'DevicesNotFoundError') {
+        msg = 'No microphone found. Please connect a microphone or check your device settings.'
+      } else if (permErr.name === 'NotReadableError' || permErr.name === 'TrackStartError') {
+        msg = 'Microphone is already in use by another application.'
+      }
+
       setError(msg)
       setIsConnecting(false)
       onError?.(msg)

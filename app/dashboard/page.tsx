@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { DeleteButton } from '@/components/dashboard/DeleteButton'
+import { ClearAllButton } from '@/components/dashboard/ClearAllButton'
 import { formatDate } from '@/lib/utils'
 import { Mic, FileText, BookOpen } from 'lucide-react'
 import Link from 'next/link'
@@ -26,7 +27,7 @@ export default async function DashboardPage({
 
   const sourceFilter = searchParams.source
 
-  let query = supabase.from('session_with_summary_status').select('*').order('created_at', { ascending: false })
+  let query = supabase.from('session_with_summary_status').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
   
   if (sourceFilter === 'recording' || sourceFilter === 'pdf') {
     query = query.eq('source', sourceFilter)
@@ -46,9 +47,12 @@ export default async function DashboardPage({
               <h1 className="font-display text-3xl font-bold text-text-primary">Welcome back</h1>
               <p className="text-text-secondary mt-1">Ready to master your next topic?</p>
             </div>
-            <Link href="/new">
-              <Button className="w-full md:w-auto">New Session</Button>
-            </Link>
+            <div className="flex gap-2 w-full md:w-auto">
+              <ClearAllButton />
+              <Link href="/new" className="w-full md:w-auto">
+                <Button className="w-full md:w-auto">New Session</Button>
+              </Link>
+            </div>
           </div>
 
           <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 hide-scrollbar">
