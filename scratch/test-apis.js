@@ -1,6 +1,6 @@
 const http = require('http');
 
-const req = http.request('http://localhost:3001/api/sessions', { 
+const req = http.request('http://localhost:3001/api/sessions', {
   method: 'GET',
   headers: { 'Accept': 'application/json' }
 }, (res) => {
