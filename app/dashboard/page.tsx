@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { DeleteButton } from '@/components/dashboard/DeleteButton'
 import { formatDate } from '@/lib/utils'
 import { Mic, FileText, BookOpen } from 'lucide-react'
 import Link from 'next/link'
@@ -80,9 +81,12 @@ export default async function DashboardPage({
                         <span className="flex items-center gap-1"><FileText className="h-3 w-3" /> PDF</span>
                       )}
                     </Badge>
-                    <Badge variant={session.status}>
-                      {session.status}
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge variant={session.status}>
+                        {session.status}
+                      </Badge>
+                      <DeleteButton sessionId={session.id} />
+                    </div>
                   </div>
                   
                   <div className="flex-1">
@@ -105,7 +109,7 @@ export default async function DashboardPage({
                 <EmptyState 
                   icon={<BookOpen className="h-12 w-12" />}
                   title="No sessions found"
-                  description={sourceFilter ? `You don't have any ${sourceFilter} sessions yet.` : "Get started by recording a lecture or uploading a PDF."}
+                  description={sourceFilter ? `You don&apos;t have any ${sourceFilter} sessions yet.` : "Get started by recording a lecture or uploading a PDF."}
                   action={
                     <Link href="/new">
                       <Button>Create your first session</Button>

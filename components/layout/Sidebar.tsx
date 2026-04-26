@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { PlusCircle, LayoutDashboard, User } from 'lucide-react'
+import { PlusCircle, LayoutDashboard, Trash2 } from 'lucide-react'
+import { LogoutButton } from './LogoutButton'
 
 export function Sidebar() {
   return (
@@ -16,12 +17,13 @@ export function Sidebar() {
           <PlusCircle className="h-5 w-5" />
           New Session
         </Link>
+        <Link href="/trash" className="flex items-center gap-3 rounded-lg px-4 py-2 text-text-secondary hover:bg-bg-elevated hover:text-text-primary">
+          <Trash2 className="h-5 w-5" />
+          Trash
+        </Link>
       </nav>
-      <div className="mt-auto">
-        <div className="flex items-center gap-3 rounded-lg px-4 py-2 text-text-secondary hover:bg-bg-elevated hover:text-text-primary cursor-pointer">
-          <User className="h-5 w-5" />
-          Profile
-        </div>
+      <div className="mt-auto space-y-1">
+        <LogoutButton />
       </div>
     </div>
   )

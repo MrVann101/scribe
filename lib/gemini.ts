@@ -1,4 +1,4 @@
-const getModel = () => process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-2.5-flash';
+const getModel = () => process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-2.0-flash';
 const getApiKey = () => {
   const key = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
   if (!key) throw new Error('NEXT_PUBLIC_GEMINI_API_KEY is not set');

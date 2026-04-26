@@ -1,12 +1,11 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { TopBar } from '@/components/layout/TopBar'
 import { Input } from '@/components/ui/Input'
 import { MicButton } from '@/components/record/MicButton'
 import { TranscriptViewer, TranscriptChunk } from '@/components/record/TranscriptViewer'
-import { useGeminiLive } from '@/hooks/useGeminiLive'
-import { useMicrophone } from '@/hooks/useMicrophone'
+import { useWebSpeech } from '@/hooks/useWebSpeech'
 import { SaveTranscriptChunkRequest } from '@/types/api'
 
 export default function RecordPage() {
@@ -16,21 +15,15 @@ export default function RecordPage() {
   const [subject, setSubject] = useState('')
   const [chunks, setChunks] = useState<TranscriptChunk[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
+  const chunkIndexRef = useRef(0)
 
-  const { connect, disconnect, sendAudio, isConnected, isConnecting, error } = useGeminiLive({
-    onTranscript: async (text) => {
-      const isAlert = text.includes('<alert>')
-      let topicLabel = undefined
-      let displayText = text
-      
-      const topicMatch = text.match(/^Topic:\s*(.+)/i)
-      if (topicMatch) {
-        topicLabel = topicMatch[1]
-        displayText = text.replace(/^Topic:\s*(.+)/i, '').trim()
-      }
-
-      const newChunk = { text: displayText, isAlert, topicLabel }
+  const { isRecording, isConnecting, error, startRecording, stopRecording } = useWebSpeech({
+    onTranscript: (text) => {
+      const newChunk: TranscriptChunk = { text, isAlert: false, topicLabel: undefined }
       setChunks(prev => [...prev, newChunk])
+
+      const currentIndex = chunkIndexRef.current
+      chunkIndexRef.current += 1
 
       if (sessionId) {
         fetch('/api/transcripts', {
@@ -38,10 +31,10 @@ export default function RecordPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             session_id: sessionId,
-            chunk_index: chunks.length,
-            text: displayText,
-            is_alert: isAlert,
-            topic_label: topicLabel,
+            chunk_index: currentIndex,
+            text,
+            is_alert: false,
+            topic_label: undefined,
             source: 'recording'
           } as SaveTranscriptChunkRequest)
         }).catch(console.error)
@@ -49,8 +42,7 @@ export default function RecordPage() {
     }
   })
 
-  const { isRecording, startRecording, stopRecording } = useMicrophone({ sendAudio })
-
+  // Create session on mount
   useEffect(() => {
     fetch('/api/sessions', {
       method: 'POST',
@@ -66,31 +58,36 @@ export default function RecordPage() {
 
   const handleStart = async () => {
     if (!sessionId) return
-    await connect()
     await startRecording()
   }
 
   const handleStop = async () => {
     stopRecording()
-    disconnect()
     setIsProcessing(true)
 
-    try {
-      await fetch('/api/summarize', {
-        method: 'POST',
+    // Update session title if user entered one
+    if (title.trim() && sessionId) {
+      await fetch(`/api/sessions/${sessionId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId })
-      })
-      router.push(`/session/${sessionId}`)
-    } catch (err) {
-      console.error(err)
-      setIsProcessing(false)
+        body: JSON.stringify({ title: title.trim(), subject: subject.trim() || null })
+      }).catch(console.error)
     }
+
+    // Fire-and-forget: kick off summarization in the background
+    fetch('/api/summarize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId })
+    }).catch(console.error)
+
+    // Redirect immediately — the session page shows a loading state while processing
+    router.push(`/session/${sessionId}`)
   }
 
   let state: 'idle' | 'connecting' | 'recording' | 'processing' = 'idle'
   if (isConnecting) state = 'connecting'
-  if (isConnected && isRecording) state = 'recording'
+  if (isRecording) state = 'recording'
   if (isProcessing) state = 'processing'
 
   return (
@@ -124,7 +121,7 @@ export default function RecordPage() {
           />
           <div className="mt-4 text-center">
             {state === 'recording' && (
-              <p className="text-accent-blue font-medium animate-pulse">Recording & Transcribing...</p>
+              <p className="text-accent-blue font-medium animate-pulse">Recording &amp; Transcribing...</p>
             )}
             {state === 'processing' && (
               <p className="text-warning font-medium animate-pulse">Generating Study Guide...</p>

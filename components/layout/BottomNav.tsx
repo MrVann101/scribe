@@ -1,5 +1,6 @@
 import Link from 'next/link'
-import { LayoutDashboard, PlusCircle, User } from 'lucide-react'
+import { LayoutDashboard, PlusCircle, Trash2 } from 'lucide-react'
+import { LogoutButton } from './LogoutButton'
 
 export function BottomNav() {
   return (
@@ -12,10 +13,11 @@ export function BottomNav() {
         <PlusCircle className="h-6 w-6 mb-1" />
         <span className="text-xs">New</span>
       </Link>
-      <div className="flex flex-col items-center text-text-secondary hover:text-text-primary cursor-pointer">
-        <User className="h-6 w-6 mb-1" />
-        <span className="text-xs">Profile</span>
-      </div>
+      <Link href="/trash" className="flex flex-col items-center text-text-secondary hover:text-text-primary">
+        <Trash2 className="h-6 w-6 mb-1" />
+        <span className="text-xs">Trash</span>
+      </Link>
+      <LogoutButton variant="bottom" />
     </div>
   )
 }
