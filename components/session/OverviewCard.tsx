@@ -1,34 +1,30 @@
-// components/session/OverviewCard.tsx
-// 3-sentence overview + action items
-
 import { Card } from '@/components/ui/Card'
-import { CheckCircle, Calendar } from 'lucide-react'
-import type { ActionItem } from '@/types/database'
+import { Badge } from '@/components/ui/Badge'
+import { ActionItem } from '@/types/database'
 
 interface OverviewCardProps {
-  overview: string
-  actionItems: ActionItem[]
+  overview: string | null
+  actionItems: ActionItem[] | null
 }
 
 export function OverviewCard({ overview, actionItems }: OverviewCardProps) {
   return (
-    <Card className="md:row-span-1">
-      <h3 className="text-lg font-semibold text-white mb-3">Overview</h3>
-      <p className="text-gray-300 text-sm leading-relaxed">{overview}</p>
+    <Card className="flex flex-col gap-4">
+      <h2 className="font-display text-xl font-semibold text-text-primary">Overview</h2>
+      <p className="text-text-secondary text-sm leading-relaxed whitespace-pre-wrap">
+        {overview || "No overview available."}
+      </p>
 
-      {actionItems.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-white/10">
-          <h4 className="text-sm font-medium text-gray-400 mb-2">Action Items</h4>
-          <ul className="space-y-2">
-            {actionItems.map((item, index) => (
-              <li key={index} className="flex items-start gap-2 text-sm">
-                <CheckCircle className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                <span className="text-gray-300">{item.text}</span>
+      {actionItems && actionItems.length > 0 && (
+        <div className="mt-2 pt-4 border-t border-border">
+          <h3 className="font-medium text-text-primary mb-3 text-sm">Action Items</h3>
+          <ul className="space-y-3">
+            {actionItems.map((item, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-sm text-text-secondary">
+                <div className="mt-1.5 h-1.5 w-1.5 rounded-full bg-accent-blue shrink-0" />
+                <span className="flex-1 leading-snug">{item.text}</span>
                 {item.due && (
-                  <span className="text-amber-400 text-xs ml-auto flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {item.due}
-                  </span>
+                  <Badge variant="alert" className="shrink-0">{item.due}</Badge>
                 )}
               </li>
             ))}
@@ -38,5 +34,3 @@ export function OverviewCard({ overview, actionItems }: OverviewCardProps) {
     </Card>
   )
 }
-
-export default OverviewCard

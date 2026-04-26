@@ -1,237 +1,138 @@
 'use client'
-
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { TopBar } from '@/components/layout/TopBar'
+import { Input } from '@/components/ui/Input'
+import { MicButton } from '@/components/record/MicButton'
+import { TranscriptViewer, TranscriptChunk } from '@/components/record/TranscriptViewer'
 import { useGeminiLive } from '@/hooks/useGeminiLive'
+import { useMicrophone } from '@/hooks/useMicrophone'
+import { SaveTranscriptChunkRequest } from '@/types/api'
 
 export default function RecordPage() {
-  const [isRecording, setIsRecording] = useState(false)
-  const [transcript, setTranscript] = useState<string>('')
-  const [sessionId, setSessionId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const transcriptEndRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [title, setTitle] = useState('')
+  const [subject, setSubject] = useState('')
+  const [chunks, setChunks] = useState<TranscriptChunk[]>([])
+  const [isProcessing, setIsProcessing] = useState(false)
 
-  const { isConnected, isConnecting, connect, disconnect, sendAudio, error: wsError } = useGeminiLive({
-    onTranscript: (text) => {
-      setTranscript(prev => prev + '\n' + text)
-    },
-    onError: (err) => {
-      setError(err.message)
-    },
-    onConnected: () => {
-      console.log('Connected to Gemini Live')
-    },
-    onDisconnected: () => {
-      console.log('Disconnected from Gemini Live')
+  const { connect, disconnect, sendAudio, isConnected, isConnecting, error } = useGeminiLive({
+    onTranscript: async (text) => {
+      const isAlert = text.includes('<alert>')
+      let topicLabel = undefined
+      let displayText = text
+      
+      const topicMatch = text.match(/^Topic:\s*(.+)/i)
+      if (topicMatch) {
+        topicLabel = topicMatch[1]
+        displayText = text.replace(/^Topic:\s*(.+)/i, '').trim()
+      }
+
+      const newChunk = { text: displayText, isAlert, topicLabel }
+      setChunks(prev => [...prev, newChunk])
+
+      if (sessionId) {
+        fetch('/api/transcripts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: sessionId,
+            chunk_index: chunks.length,
+            text: displayText,
+            is_alert: isAlert,
+            topic_label: topicLabel,
+            source: 'recording'
+          } as SaveTranscriptChunkRequest)
+        }).catch(console.error)
+      }
     }
   })
 
-  // Auto-scroll transcript
+  const { isRecording, startRecording, stopRecording } = useMicrophone({ sendAudio })
+
   useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [transcript])
+    fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'New Recording', source: 'recording' })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.id) setSessionId(data.id)
+      })
+      .catch(console.error)
+  }, [])
 
-  // Audio capture setup
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const analyserRef = useRef<AnalyserNode | null>(null)
+  const handleStart = async () => {
+    if (!sessionId) return
+    await connect()
+    await startRecording()
+  }
 
-  const startRecording = async () => {
+  const handleStop = async () => {
+    stopRecording()
+    disconnect()
+    setIsProcessing(true)
+
     try {
-      setError(null)
-      
-      // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      })
-
-      // Set up audio context for processing
-      const audioContext = new AudioContext()
-      const source = audioContext.createMediaStreamSource(stream)
-      const analyser = audioContext.createAnalyser()
-      analyser.fftSize = 256
-      source.connect(analyser)
-      
-      audioContextRef.current = audioContext
-      analyserRef.current = analyser
-
-      // Connect to Gemini Live
-      await connect()
-      
-      // Start capturing audio
-      const bufferSize = 4096
-      const recorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
-      })
-
-      recorder.ondataavailable = async (event) => {
-        if (event.data.size > 0 && isConnected) {
-          // Convert to ArrayBuffer and send
-          const arrayBuffer = await event.data.arrayBuffer()
-          sendAudio(arrayBuffer)
-        }
-      }
-
-      recorder.start(100) // Collect data every 100ms
-      mediaRecorderRef.current = recorder
-      
-      setIsRecording(true)
-
-      // Create session in background
-      const sessionRes = await fetch('/api/sessions', {
+      await fetch('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: 'recording' })
+        body: JSON.stringify({ session_id: sessionId })
       })
-      const sessionData = await sessionRes.json()
-      if (sessionData.session_id) {
-        setSessionId(sessionData.session_id)
-      }
-
+      router.push(`/session/${sessionId}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start recording')
+      console.error(err)
+      setIsProcessing(false)
     }
   }
 
-  const stopRecording = async () => {
-    if (mediaRecorderRef.current) {
-      mediaRecorderRef.current.stop()
-      mediaRecorderRef.current = null
-    }
-    
-    if (audioContextRef.current) {
-      await audioContextRef.current.close()
-      audioContextRef.current = null
-    }
-
-    disconnect()
-    setIsRecording(false)
-
-    // Process transcript and generate summary
-    if (sessionId && transcript) {
-      try {
-        // Save transcript chunks
-        await fetch('/api/transcripts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            session_id: sessionId,
-            transcript: transcript
-          })
-        })
-
-        // Trigger summarization
-        await fetch('/api/summarize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            session_id: sessionId,
-            source: 'recording'
-          })
-        })
-
-        // Redirect to session
-        router.push(`/session/${sessionId}`)
-      } catch (err) {
-        console.error('Failed to process recording:', err)
-      }
-    }
-  }
+  let state: 'idle' | 'connecting' | 'recording' | 'processing' = 'idle'
+  if (isConnecting) state = 'connecting'
+  if (isConnected && isRecording) state = 'recording'
+  if (isProcessing) state = 'processing'
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center mb-8">
-          <a href="/" className="text-purple-300 hover:text-white transition-colors">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </a>
-          <h1 className="text-2xl font-bold text-white ml-4">Live Recording</h1>
+    <div className="flex flex-col h-screen bg-bg-base">
+      <TopBar title="Record Lecture" />
+      
+      <div className="flex flex-col flex-1 max-w-3xl w-full mx-auto p-4 md:p-8 overflow-hidden">
+        <div className="space-y-4 mb-8 shrink-0">
+          <Input 
+            placeholder="Lecture Title" 
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="text-lg font-medium bg-transparent border-none px-0 focus-visible:ring-0 text-text-primary placeholder:text-text-muted"
+          />
+          <Input 
+            placeholder="Subject (Optional)" 
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            className="text-sm bg-transparent border-none px-0 focus-visible:ring-0 text-text-secondary placeholder:text-text-muted"
+          />
         </div>
 
-        {/* Recording Controls */}
-        <div className="max-w-2xl mx-auto text-center mb-8">
-          <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center transition-all ${
-            isRecording 
-              ? 'bg-red-500 animate-pulse' 
-              : 'bg-purple-600 hover:bg-purple-700'
-          }`}>
-            <button
-              onClick={isRecording ? stopRecording : startRecording}
-              disabled={isConnecting}
-              className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center"
-            >
-              {isConnecting ? (
-                <svg className="animate-spin h-10 w-10 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              ) : isRecording ? (
-                <div className="w-8 h-8 bg-white rounded-sm" />
-              ) : (
-                <div className="w-10 h-10 bg-white rounded-full" />
-              )}
-            </button>
-          </div>
-          
-          <p className="text-white mt-4 text-lg">
-            {isConnecting ? 'Connecting...' : isRecording ? 'Recording...' : 'Tap to start recording'}
-          </p>
-          
-          {error && (
-            <div className="mt-4 p-4 bg-red-500/20 border border-red-400 rounded-lg text-red-200">
-              {error}
-            </div>
-          )}
-          
-          {wsError && (
-            <div className="mt-4 p-4 bg-yellow-500/20 border border-yellow-400 rounded-lg text-yellow-200">
-              {wsError}
-            </div>
-          )}
+        <div className="flex-1 min-h-0 relative bg-bg-elevated/30 rounded-xl border border-border overflow-hidden p-4">
+          <TranscriptViewer chunks={chunks} />
         </div>
 
-        {/* Transcript Display */}
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white/5 rounded-2xl p-6 min-h-[400px] max-h-[600px] overflow-y-auto">
-            <h2 className="text-white font-semibold mb-4 flex items-center">
-              <span className={`w-3 h-3 rounded-full mr-2 ${isRecording ? 'bg-red-500 animate-pulse' : 'bg-gray-500'}`} />
-              Live Transcript
-            </h2>
-            
-            {transcript ? (
-              <div className="text-purple-100 whitespace-pre-wrap">
-                {transcript}
-              </div>
-            ) : (
-              <p className="text-purple-300/50 text-center py-20">
-                {isRecording ? 'Listening...' : 'Start recording to see transcript'}
-              </p>
+        <div className="mt-8 flex flex-col items-center justify-center shrink-0">
+          <MicButton 
+            state={state} 
+            onClick={state === 'recording' ? handleStop : handleStart} 
+          />
+          <div className="mt-4 text-center">
+            {state === 'recording' && (
+              <p className="text-accent-blue font-medium animate-pulse">Recording & Transcribing...</p>
             )}
-            <div ref={transcriptEndRef} />
-          </div>
-        </div>
-
-        {/* Tips */}
-        <div className="max-w-2xl mx-auto mt-8">
-          <div className="bg-purple-500/20 border border-purple-400/30 rounded-xl p-4">
-            <h3 className="text-white font-medium mb-2">💡 Recording Tips</h3>
-            <ul className="text-purple-200 text-sm space-y-1">
-              <li>• Ensure you're in a quiet environment</li>
-              <li>• Speak clearly and at a normal pace</li>
-              <li>• The instructor may switch between English and Bisaya</li>
-              <li>• Important exam/quiz dates will be automatically flagged</li>
-            </ul>
+            {state === 'processing' && (
+              <p className="text-warning font-medium animate-pulse">Generating Study Guide...</p>
+            )}
+            {error && <p className="text-danger text-sm">{error}</p>}
           </div>
         </div>
       </div>
-    </main>
+    </div>
   )
 }

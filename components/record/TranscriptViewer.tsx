@@ -1,11 +1,6 @@
-'use client'
-
-// components/record/TranscriptViewer.tsx
-// Renders transcript chunks with alerts and topic labels
-
 import { useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import { AlertTriangle, Tag } from 'lucide-react'
+import { Bell } from 'lucide-react'
 
 export interface TranscriptChunk {
   text: string
@@ -15,75 +10,42 @@ export interface TranscriptChunk {
 
 interface TranscriptViewerProps {
   chunks: TranscriptChunk[]
-  className?: string
 }
 
-export function TranscriptViewer({ chunks, className }: TranscriptViewerProps) {
-  const bottomRef = useRef<HTMLDivElement>(null)
-
-  // Auto-scroll to bottom on new chunk
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [chunks.length])
-
-  if (chunks.length === 0) {
-    return (
-      <div className={cn('flex flex-col items-center justify-center py-12 text-center', className)}>
-        <div className="h-12 w-12 rounded-full bg-gray-800 flex items-center justify-center mb-4">
-          <Mic className="h-6 w-6 text-gray-500" />
-        </div>
-        <p className="text-gray-400 text-sm">Start speaking to see your transcript here</p>
-      </div>
-    )
-  )
-}
-
-// Need to import Mic for the empty state
-import { Mic } from 'lucide-react'
-
-export function TranscriptViewerWithImport({ chunks, className }: TranscriptViewerProps) {
+export function TranscriptViewer({ chunks }: TranscriptViewerProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [chunks.length])
+  }, [chunks])
 
   if (chunks.length === 0) {
     return (
-      <div className={cn('flex flex-col items-center justify-center py-12 text-center', className)}>
-        <div className="h-12 w-12 rounded-full bg-gray-800 flex items-center justify-center mb-4">
-          <Mic className="h-6 w-6 text-gray-500" />
-        </div>
-        <p className="text-gray-400 text-sm">Start speaking to see your transcript here</p>
+      <div className="flex h-full items-center justify-center text-text-muted italic">
+        Waiting for audio...
       </div>
     )
   }
 
   return (
-    <div className={cn('space-y-3 overflow-y-auto max-h-96', className)}>
-      {chunks.map((chunk, index) => (
-        <div key={index} className="animate-fade-in">
-          {/* Topic label */}
+    <div className="flex flex-col gap-4 overflow-y-auto pr-2 pb-8 h-full">
+      {chunks.map((chunk, i) => (
+        <div key={i} className="animate-in fade-in slide-in-from-bottom-2 duration-300">
           {chunk.topicLabel && (
-            <div className="flex items-center gap-1.5 mb-2">
-              <Tag className="h-3 w-3 text-violet-400" />
-              <span className="text-xs font-medium text-violet-400">{chunk.topicLabel}</span>
+            <div className="mb-2 inline-flex items-center rounded-full bg-accent-violet/10 px-2.5 py-0.5 text-xs font-medium text-accent-violet border border-accent-violet/20">
+              {chunk.topicLabel}
             </div>
           )}
-          
-          {/* Transcript text */}
           <div
             className={cn(
-              'rounded-lg p-3 text-sm leading-relaxed',
-              chunk.isAlert
-                ? 'bg-amber-600/10 border-l-2 border-amber-500 text-amber-100'
-                : 'bg-white/5 text-gray-200'
+              "rounded-lg p-3 text-sm font-mono text-text-primary bg-bg-surface border border-border shadow-sm whitespace-pre-wrap",
+              chunk.isAlert && "border-l-4 border-l-warning bg-warning/5 text-warning border-y-warning/20 border-r-warning/20"
             )}
           >
             {chunk.isAlert && (
-              <div className="flex items-center gap-1.5 mb-1">
-                <AlertTriangle className="h-3 w-3 text-amber-400" />
-                <span className="text-xs font-medium text-amber-400">Important</span>
+              <div className="mb-1 flex items-center gap-1 font-bold">
+                <Bell className="h-3 w-3" />
+                Alert
               </div>
             )}
             {chunk.text}
@@ -93,9 +55,4 @@ export function TranscriptViewerWithImport({ chunks, className }: TranscriptView
       <div ref={bottomRef} />
     </div>
   )
-}
-
-// Export the main component
-export default function TranscriptViewerMain(props: TranscriptViewerProps) {
-  return TranscriptViewerWithImport(props)
 }

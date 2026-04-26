@@ -1,142 +1,114 @@
 'use client'
-
-// components/session/QuizCard.tsx
-// MCQ with answer reveal, score at end
-
 import { useState } from 'react'
 import { Card } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { QuizQuestion } from '@/types/database'
 import { cn } from '@/lib/utils'
-import { CheckCircle, XCircle, Trophy } from 'lucide-react'
-import type { QuizQuestion } from '@/types/database'
 
-interface QuizCardProps {
-  questions: QuizQuestion[]
-}
-
-export function QuizCard({ questions }: QuizCardProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
-  const [showResult, setShowResult] = useState(false)
+export function QuizCard({ questions }: { questions: QuizQuestion[] | null }) {
+  const [currentIdx, setCurrentIdx] = useState(0)
+  const [selected, setSelected] = useState<string | null>(null)
   const [score, setScore] = useState(0)
-  const [isComplete, setIsComplete] = useState(false)
+  const [showResult, setShowResult] = useState(false)
 
-  if (questions.length === 0) {
-    return (
-      <Card>
-        <p className="text-gray-400 text-center py-8">No quiz available for this session.</p>
-      </Card>
-    )
-  }
+  if (!questions || questions.length === 0) return null
 
-  const currentQuestion = questions[currentIndex]
+  const isFinished = showResult
+  const question = questions[currentIdx]
 
-  const handleSelect = (answer: string) => {
-    if (showResult) return
-    
-    setSelectedAnswer(answer)
-    setShowResult(true)
-    
-    if (answer === currentQuestion.answer) {
-      setScore(prev => prev + 1)
+  const handleSelect = (optionLabel: string) => {
+    if (selected) return // already answered
+    setSelected(optionLabel)
+    if (optionLabel === question.answer) {
+      setScore(s => s + 1)
     }
   }
 
   const handleNext = () => {
-    if (currentIndex < questions.length - 1) {
-      setCurrentIndex(prev => prev + 1)
-      setSelectedAnswer(null)
-      setShowResult(false)
+    if (currentIdx < questions.length - 1) {
+      setCurrentIdx(i => i + 1)
+      setSelected(null)
     } else {
-      setIsComplete(true)
+      setShowResult(true)
     }
   }
 
-  if (isComplete) {
-    return (
-      <Card>
-        <div className="text-center py-8">
-          <Trophy className="h-16 w-16 text-amber-400 mx-auto mb-4" />
-          <h3 className="text-2xl font-bold text-white mb-2">Quiz Complete!</h3>
-          <p className="text-gray-400 mb-4">
-            You got {score} out of {questions.length} correct
-          </p>
-          <button
-            onClick={() => {
-              setCurrentIndex(0)
-              setSelectedAnswer(null)
-              setShowResult(false)
-              setScore(0)
-              setIsComplete(false)
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Try Again
-          </button>
-        </div>
-      </Card>
-    )
-  }
-
   return (
-    <Card>
-      <div className="mb-4 flex items-center justify-between">
-        <span className="text-sm text-gray-400">
-          Question {currentIndex + 1} of {questions.length}
-        </span>
-        <span className="text-sm text-gray-400">Score: {score}</span>
+    <Card className="flex flex-col h-full min-h-[300px]">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-display text-xl font-semibold text-text-primary">Quiz</h2>
+        {!isFinished && (
+          <span className="text-sm font-medium text-text-secondary">
+            {currentIdx + 1} / {questions.length}
+          </span>
+        )}
       </div>
 
-      <h4 className="text-lg font-medium text-white mb-4">{currentQuestion.question}</h4>
-
-      <div className="space-y-2">
-        {currentQuestion.options.map((option, index) => {
-          const optionLetter = ['A', 'B', 'C', 'D'][index]
-          const isCorrect = optionLetter === currentQuestion.answer
-          const isSelected = optionLetter === selectedAnswer
-
-          let bgClass = 'bg-white/5 hover:bg-white/10'
-          if (showResult) {
-            if (isCorrect) {
-              bgClass = 'bg-green-600/20 border border-green-500'
-            } else if (isSelected && !isCorrect) {
-              bgClass = 'bg-red-600/20 border border-red-500'
-            }
-          }
-
-          return (
-            <button
-              key={index}
-              onClick={() => handleSelect(optionLetter)}
-              disabled={showResult}
-              className={cn(
-                'w-full p-3 rounded-lg text-left text-sm transition-colors',
-                bgClass,
-                !showResult && 'cursor-pointer'
-              )}
-            >
-              <span className="font-medium text-gray-300">{option}</span>
+      {isFinished ? (
+        <div className="flex flex-col items-center justify-center flex-1 text-center animate-in fade-in zoom-in-95 duration-300">
+          <div className="text-5xl mb-4 text-accent-blue font-display font-bold">
+            {score} / {questions.length}
+          </div>
+          <h3 className="text-xl text-text-primary font-medium mb-6">
+            {score === questions.length ? 'Perfect!' : 'Great effort!'}
+          </h3>
+          <Button onClick={() => {
+            setCurrentIdx(0)
+            setSelected(null)
+            setScore(0)
+            setShowResult(false)
+          }}>
+            Retake Quiz
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-col flex-1 animate-in fade-in slide-in-from-right-4 duration-300">
+          <p className="text-text-primary font-medium mb-6">{question.question}</p>
+          <div className="flex flex-col gap-3 flex-1">
+            {question.options.map((option, i) => {
+              const label = option.charAt(0) // "A", "B", "C", "D"
+              const isSelected = selected === label
+              const isCorrect = label === question.answer
               
-              {showResult && isCorrect && (
-                <CheckCircle className="inline-block h-4 w-4 text-green-400 ml-2" />
-              )}
-              {showResult && isSelected && !isCorrect && (
-                <XCircle className="inline-block h-4 w-4 text-red-400 ml-2" />
-              )}
-            </button>
-          )
-        })}
-      </div>
+              let optionClass = "bg-bg-base border-border hover:border-accent-blue/50 hover:bg-bg-elevated"
+              
+              if (selected) {
+                if (isCorrect) {
+                  optionClass = "bg-success/10 border-success text-success"
+                } else if (isSelected && !isCorrect) {
+                  optionClass = "bg-danger/10 border-danger text-danger"
+                } else {
+                  optionClass = "bg-bg-base border-border opacity-50"
+                }
+              }
 
-      {showResult && (
-        <button
-          onClick={handleNext}
-          className="w-full mt-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          {currentIndex < questions.length - 1 ? 'Next Question' : 'See Results'}
-        </button>
+              return (
+                <button
+                  key={i}
+                  disabled={selected !== null}
+                  onClick={() => handleSelect(label)}
+                  className={cn(
+                    "text-left p-3 rounded-lg border transition-all duration-200 text-sm",
+                    optionClass,
+                    !selected && "cursor-pointer"
+                  )}
+                >
+                  {option}
+                </button>
+              )
+            })}
+          </div>
+          <div className="mt-6 flex justify-end">
+            <Button 
+              disabled={!selected} 
+              onClick={handleNext}
+              variant={selected ? 'primary' : 'secondary'}
+            >
+              {currentIdx === questions.length - 1 ? 'Finish' : 'Next Question'}
+            </Button>
+          </div>
+        </div>
       )}
     </Card>
   )
 }
-
-export default QuizCard

@@ -1,25 +1,29 @@
 import type { Metadata } from "next";
 import { Syne, DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
 
-const syne = Syne({
+const syne = Syne({ 
+  subsets: ["latin"], 
   variable: "--font-syne",
-  subsets: ["latin"],
+  display: 'swap',
 });
 
-const dmSans = DM_Sans({
+const dmSans = DM_Sans({ 
+  subsets: ["latin"], 
   variable: "--font-dm-sans",
-  subsets: ["latin"],
+  display: 'swap',
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
+const jetbrainsMono = JetBrains_Mono({ 
+  subsets: ["latin"], 
+  variable: "--font-jetbrains",
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
-  title: "Scribe — AI Study Companion",
-  description: "AI-powered study companion for Filipino college students",
+  title: "Scribe",
+  description: "AI-powered study companion",
 };
 
 export default function RootLayout({
@@ -28,8 +32,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark h-full antialiased">
-      <body className={`${syne.variable} ${dmSans.variable} ${jetbrainsMono.variable} min-h-full flex flex-col bg-background text-foreground`}>
+    <html lang="en" className="dark">
+      <body className={cn(syne.variable, dmSans.variable, jetbrainsMono.variable, "antialiased")}>
         {children}
       </body>
     </html>

@@ -1,11 +1,7 @@
-'use client'
-
-// components/chat/ChatThread.tsx
-// Message list, user right / AI left
-
+import { useEffect, useRef } from 'react'
+import { ChatMessage } from '@/types/database'
 import { cn } from '@/lib/utils'
 import { Bot, User } from 'lucide-react'
-import type { ChatMessage } from '@/hooks/useChat'
 
 interface ChatThreadProps {
   messages: ChatMessage[]
@@ -13,69 +9,61 @@ interface ChatThreadProps {
 }
 
 export function ChatThread({ messages, isLoading }: ChatThreadProps) {
-  if (messages.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <Bot className="h-12 w-12 text-gray-600 mb-4" />
-        <p className="text-gray-400">Start a conversation about your study material</p>
-      </div>
-    )
-  }
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, isLoading])
 
   return (
-    <div className="space-y-4">
-      {messages.map((message) => (
-        <div
-          key={message.id}
-          className={cn(
-            'flex gap-3',
-            message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-          )}
-        >
-          {/* Avatar */}
-          <div
-            className={cn(
-              'h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0',
-              message.role === 'user' ? 'bg-blue-600' : 'bg-violet-600'
-            )}
-          >
-            {message.role === 'user' ? (
-              <User className="h-4 w-4 text-white" />
-            ) : (
-              <Bot className="h-4 w-4 text-white" />
-            )}
-          </div>
-
-          {/* Message bubble */}
-          <div
-            className={cn(
-              'max-w-[80%] rounded-2xl px-4 py-2',
-              message.role === 'user'
-                ? 'bg-blue-600 text-white rounded-br-md'
-                : 'bg-white/10 text-gray-200 rounded-bl-md'
-            )}
-          >
-            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-          </div>
+    <div className="flex flex-col gap-6 p-4 overflow-y-auto h-full">
+      {messages.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center text-text-muted h-full">
+          <Bot className="h-12 w-12 mb-4 opacity-20" />
+          <p>Ask me anything about this session!</p>
         </div>
-      ))}
-
-      {isLoading && (
-        <div className="flex gap-3">
-          <div className="h-8 w-8 rounded-full bg-violet-600 flex items-center justify-center">
-            <Bot className="h-4 w-4 text-white" />
-          </div>
-          <div className="bg-white/10 rounded-2xl rounded-bl-md px-4 py-2">
-            <div className="flex gap-1">
-              <span className="h-2 w-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-              <span className="h-2 w-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-              <span className="h-2 w-2 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+      ) : (
+        messages.map((msg, i) => (
+          <div
+            key={msg.id}
+            className={cn(
+              "flex gap-4 max-w-[85%] animate-in fade-in slide-in-from-bottom-2",
+              msg.role === 'user' ? "self-end flex-row-reverse" : "self-start"
+            )}
+          >
+            <div className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+              msg.role === 'user' ? "bg-accent-blue/20 text-accent-blue" : "bg-accent-violet/20 text-accent-violet"
+            )}>
+              {msg.role === 'user' ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
             </div>
+            <div
+              className={cn(
+                "rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
+                msg.role === 'user' 
+                  ? "bg-accent-blue text-white rounded-tr-sm" 
+                  : "bg-bg-elevated border border-border text-text-primary rounded-tl-sm"
+              )}
+            >
+              {msg.content}
+            </div>
+          </div>
+        ))
+      )}
+      
+      {isLoading && (
+        <div className="flex gap-4 max-w-[85%] self-start animate-in fade-in">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent-violet/20 text-accent-violet">
+            <Bot className="h-4 w-4" />
+          </div>
+          <div className="rounded-2xl px-4 py-3 bg-bg-elevated border border-border rounded-tl-sm flex items-center gap-1">
+            <div className="h-2 w-2 bg-text-muted rounded-full animate-bounce" />
+            <div className="h-2 w-2 bg-text-muted rounded-full animate-bounce [animation-delay:0.2s]" />
+            <div className="h-2 w-2 bg-text-muted rounded-full animate-bounce [animation-delay:0.4s]" />
           </div>
         </div>
       )}
+      <div ref={bottomRef} className="h-px" />
     </div>
   )
 }
-
-export default ChatThread

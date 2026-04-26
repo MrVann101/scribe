@@ -1,7 +1,6 @@
-// components/ui/Badge.tsx
-import { type ReactNode } from 'react'
+import { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
-import { Loader2, FileText, Mic, CheckCircle, AlertTriangle, XCircle, Bot } from 'lucide-react'
+import { Spinner } from './Spinner'
 
 interface BadgeProps {
   variant?: 'recording' | 'pdf' | 'done' | 'processing' | 'error' | 'alert' | 'ai'
@@ -9,42 +8,27 @@ interface BadgeProps {
   className?: string
 }
 
-const variantStyles = {
-  recording: 'bg-blue-600/20 text-blue-400 border-blue-600/30',
-  pdf: 'bg-orange-600/20 text-orange-400 border-orange-600/30',
-  done: 'bg-green-600/20 text-green-400 border-green-600/30',
-  processing: 'bg-amber-600/20 text-amber-400 border-amber-600/30',
-  error: 'bg-red-600/20 text-red-400 border-red-600/30',
-  alert: 'bg-amber-600/20 text-amber-400 border-amber-600/30',
-  ai: 'bg-violet-600/20 text-violet-400 border-violet-600/30',
-}
-
-const variantIcons = {
-  recording: Mic,
-  pdf: FileText,
-  done: CheckCircle,
-  processing: Loader2,
-  error: XCircle,
-  alert: AlertTriangle,
-  ai: Bot,
-}
-
-export function Badge({ variant = 'ai', children, className }: BadgeProps) {
-  const Icon = variantIcons[variant]
-  const isProcessing = variant === 'processing'
+export function Badge({ variant = 'done', children, className }: BadgeProps) {
+  const variants = {
+    recording: 'bg-accent-blue/10 text-accent-blue border border-accent-blue/20',
+    pdf: 'bg-accent-orange/10 text-accent-orange border border-accent-orange/20',
+    done: 'bg-success/10 text-success border border-success/20',
+    processing: 'bg-warning/10 text-warning border border-warning/20',
+    error: 'bg-danger/10 text-danger border border-danger/20',
+    alert: 'bg-warning/10 text-warning border border-warning/20',
+    ai: 'bg-accent-violet/10 text-accent-violet border border-accent-violet/20',
+  }
 
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium',
-        variantStyles[variant],
+        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+        variants[variant],
         className
       )}
     >
-      {Icon && <Icon className={isProcessing ? 'h-3 w-3 animate-spin' : 'h-3 w-3'} />}
+      {variant === 'processing' && <Spinner className="mr-1.5 h-3 w-3" />}
       {children}
     </span>
   )
 }
-
-export default Badge

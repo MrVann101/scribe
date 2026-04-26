@@ -1,5 +1,3 @@
-// lib/supabase/client.ts
-// Used in: all 'use client' components and hooks
 import { createBrowserClient } from '@supabase/ssr'
 
 export function createClient() {

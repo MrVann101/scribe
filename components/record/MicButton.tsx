@@ -1,52 +1,38 @@
-'use client'
-
-// components/record/MicButton.tsx
-// Animated microphone button with states: idle, connecting, recording, processing
-
-import { cn } from '@/lib/utils'
 import { Mic, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface MicButtonProps {
   state: 'idle' | 'connecting' | 'recording' | 'processing'
   onClick: () => void
-  disabled?: boolean
-  className?: string
 }
 
-export function MicButton({ state, onClick, disabled, className }: MicButtonProps) {
-  const isInteractive = state === 'idle' || state === 'recording'
-
+export function MicButton({ state, onClick }: MicButtonProps) {
+  const isRecording = state === 'recording'
+  
   return (
     <button
       onClick={onClick}
-      disabled={disabled || !isInteractive}
+      disabled={state === 'connecting' || state === 'processing'}
       className={cn(
-        'relative flex h-24 w-24 items-center justify-center rounded-full transition-all',
-        state === 'idle' && 'bg-gray-700 hover:bg-gray-600 border-2 border-gray-500',
-        state === 'connecting' && 'bg-blue-600/30 border-2 border-blue-500 animate-pulse',
-        state === 'recording' && 'bg-red-600 border-2 border-red-500',
-        state === 'processing' && 'bg-amber-600/30 border-2 border-amber-500',
-        !isInteractive && 'cursor-not-allowed',
-        className
+        "relative flex h-24 w-24 items-center justify-center rounded-full transition-all duration-300 mx-auto",
+        state === 'idle' && "bg-bg-elevated text-text-muted hover:bg-border-subtle hover:text-text-primary",
+        state === 'connecting' && "bg-accent-blue/20 text-accent-blue animate-pulse",
+        isRecording && "bg-accent-blue text-white shadow-[0_0_40px_rgba(79,142,247,0.5)]",
+        state === 'processing' && "bg-warning/20 text-warning"
       )}
     >
-      {/* Recording pulse rings */}
-      {state === 'recording' && (
+      {isRecording && (
         <>
-          <span className="absolute inset-0 animate-ping rounded-full border-2 border-red-500 opacity-75" />
-          <span className="absolute inset-4 animate-ping rounded-full border-2 border-red-500 opacity-50 delay-75" />
-          <span className="absolute inset-8 animate-ping rounded-full border-2 border-red-500 opacity-25 delay-150" />
+          <div className="absolute inset-0 rounded-full border border-accent-blue animate-[ping_1.5s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
+          <div className="absolute inset-[-10px] rounded-full border border-accent-blue/30 animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
         </>
       )}
-
-      {/* Icon */}
-      {state === 'processing' || state === 'connecting' ? (
-        <Loader2 className="h-10 w-10 animate-spin text-white" />
+      
+      {state === 'processing' ? (
+        <Loader2 className="h-10 w-10 animate-spin" />
       ) : (
-        <Mic className="h-10 w-10 text-white" />
+        <Mic className="h-10 w-10" />
       )}
     </button>
   )
 }
-
-export default MicButton

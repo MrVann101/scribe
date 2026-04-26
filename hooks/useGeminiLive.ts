@@ -1,8 +1,14 @@
 'use client'
 
-// hooks/useGeminiLive.ts
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { LIVE_TRANSCRIBER_PROMPT } from '@/lib/prompts'
+
+// WebSocket URL for Gemini Multimodal Live API
+const GEMINI_LIVE_WS_URL =
+  'wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent'
+
+// Always use the live-specific model — NOT gemini-2.5-flash
+const LIVE_MODEL = 'gemini-2.0-flash-live-001'
 
 interface UseGeminiLiveOptions {
   onTranscript?: (text: string) => void
@@ -28,7 +34,6 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}): UseGeminiLive
   const [error, setError] = useState<string | null>(null)
 
   const wsRef = useRef<WebSocket | null>(null)
-  // Tracks whether user intentionally disconnected — prevents auto-reconnect
   const intentionalCloseRef = useRef(false)
 
   const connect = useCallback(async () => {
@@ -40,207 +45,100 @@ export function useGeminiLive(options: UseGeminiLiveOptions = {}): UseGeminiLive
 
     try {
       const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY
+      if (!apiKey) throw new Error('NEXT_PUBLIC_GEMINI_API_KEY is not set in .env.local')
 
-      if (!apiKey) {
-        throw new Error(
-          'NEXT_PUBLIC_GEMINI_API_KEY is not set. Add it to your .env.local file.'
-        )
-      }
-
-      // FIX 1: Correct Gemini Live API WebSocket URL
-      // The correct endpoint is "streamGenerateContent" not "streamContent"
-      // Use gemini-2.0-flash-live-001 which is the stable live audio model
-      const model = 'gemini-2.0-flash-live-001'
-      const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${apiKey}`
-
-      const ws = new WebSocket(wsUrl)
+      const ws = new WebSocket(`${GEMINI_LIVE_WS_URL}?key=${apiKey}`)
 
       ws.onopen = () => {
-        console.log('[Scribe] Gemini Live WebSocket connected')
-
-        // FIX 2: Send setup message only after connection is fully open
-        // Must send this first before any audio — Gemini requires a setup handshake
-        const setupMessage = {
+        if (ws.readyState !== WebSocket.OPEN) return
+        ws.send(JSON.stringify({
           setup: {
-            model: `models/${model}`,
-            system_instruction: {
-              parts: [{ text: LIVE_TRANSCRIBER_PROMPT }],
-            },
-            generation_config: {
-              response_modalities: ['TEXT'],
-              // Disable audio output — we only want text transcription back
-              speech_config: undefined,
-            },
+            model: `models/${LIVE_MODEL}`,
+            system_instruction: { parts: [{ text: LIVE_TRANSCRIBER_PROMPT }] },
+            generation_config: { response_modalities: ['TEXT'] },
           },
-        }
-
-        // FIX 3: Guard — confirm socket is still open before sending
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify(setupMessage))
-        }
-
+        }))
         setIsConnected(true)
         setIsConnecting(false)
         onConnected?.()
       }
 
-      ws.onmessage = (event) => {
+      ws.onmessage = async (event) => {
         try {
-          // FIX 4: Gemini Live sends Blob or string — handle both
-          const parseMessage = async (raw: MessageEvent['data']) => {
-            let text: string
-            if (raw instanceof Blob) {
-              text = await raw.text()
-            } else {
-              text = raw
-            }
+          const raw = event.data instanceof Blob ? await event.data.text() : event.data
+          const data = JSON.parse(raw)
 
-            const data = JSON.parse(text)
-
-            // Handle transcript text coming back from Gemini
-            if (data.serverContent?.modelTurn?.parts) {
-              const transcript = data.serverContent.modelTurn.parts
-                .map((part: { text?: string }) => part.text ?? '')
-                .join('')
-
-              if (transcript.trim()) {
-                onTranscript?.(transcript)
-              }
-            }
-
-            // Handle setup complete confirmation
-            if (data.setupComplete) {
-              console.log('[Scribe] Gemini Live setup complete — ready for audio')
-            }
-
-            // Handle turn complete
-            if (data.serverContent?.turnComplete) {
-              console.log('[Scribe] Turn complete')
-            }
-
-            // Handle server errors returned in the message body
-            if (data.error) {
-              console.error('[Scribe] Gemini server error:', data.error)
-              setError(`Gemini error: ${data.error.message ?? 'Unknown error'}`)
-              onError?.(new Error(data.error.message ?? 'Gemini server error'))
-            }
+          if (data.serverContent?.modelTurn?.parts) {
+            const text = data.serverContent.modelTurn.parts
+              .map((p: { text?: string }) => p.text ?? '')
+              .join('')
+            if (text.trim()) onTranscript?.(text)
           }
 
-          parseMessage(event.data)
+          if (data.error) {
+            setError(`Gemini error: ${data.error.message ?? 'Unknown'}`)
+            onError?.(new Error(data.error.message ?? 'Gemini error'))
+          }
         } catch (err) {
-          console.error('[Scribe] Error parsing WebSocket message:', err)
+          console.error('[Scribe] WS parse error:', err)
         }
       }
 
-      ws.onerror = (event) => {
-        console.error('[Scribe] WebSocket error:', event)
-        const errMessage =
-          'Connection to Gemini failed. Check your API key and internet connection.'
-        setError(errMessage)
+      ws.onerror = () => {
+        const msg = 'Connection failed. Check API key and internet.'
+        setError(msg)
         setIsConnecting(false)
-        onError?.(new Error(errMessage))
+        onError?.(new Error(msg))
       }
 
       ws.onclose = (event) => {
-        console.log(`[Scribe] WebSocket closed — code: ${event.code}, reason: ${event.reason}`)
         setIsConnected(false)
         setIsConnecting(false)
-
-        // FIX 5: Only call onDisconnected if it wasn't an intentional close
         if (!intentionalCloseRef.current) {
           onDisconnected?.()
-
-          // Helpful error messages based on close codes
-          if (event.code === 1008) {
-            setError('API key invalid or unauthorized. Check your NEXT_PUBLIC_GEMINI_API_KEY.')
-          } else if (event.code === 1011) {
-            setError('Gemini server error. Try again in a moment.')
-          } else if (event.code !== 1000) {
-            setError(`Connection closed unexpectedly (code ${event.code}). Try reconnecting.`)
-          }
+          if (event.code === 1008) setError('API key invalid or unauthorized.')
+          else if (event.code !== 1000) setError(`Disconnected (code ${event.code}). Try again.`)
         }
       }
 
       wsRef.current = ws
     } catch (err) {
-      console.error('[Scribe] Failed to connect:', err)
-      const message = err instanceof Error ? err.message : 'Failed to connect to Gemini'
-      setError(message)
+      const msg = err instanceof Error ? err.message : 'Failed to connect'
+      setError(msg)
       setIsConnecting(false)
-      onError?.(err instanceof Error ? err : new Error(message))
+      onError?.(new Error(msg))
     }
   }, [isConnected, isConnecting, onTranscript, onError, onConnected, onDisconnected])
 
   const disconnect = useCallback(() => {
-    intentionalCloseRef.current = true // Mark as intentional so onclose doesn't fire error
-
-    if (wsRef.current) {
-      wsRef.current.close(1000, 'User disconnected')
-      wsRef.current = null
-    }
-
+    intentionalCloseRef.current = true
+    wsRef.current?.close(1000, 'User disconnected')
+    wsRef.current = null
     setIsConnected(false)
     setIsConnecting(false)
     onDisconnected?.()
   }, [onDisconnected])
 
-  const sendAudio = useCallback(
-    (audioData: ArrayBuffer) => {
-      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        console.warn('[Scribe] Cannot send audio: WebSocket not open')
-        return
-      }
+  const sendAudio = useCallback((audioData: ArrayBuffer) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return
+    const bytes = new Uint8Array(audioData)
+    let binary = ''
+    bytes.forEach(b => binary += String.fromCharCode(b))
+    wsRef.current.send(JSON.stringify({
+      realtimeInput: {
+        mediaChunks: [{ mimeType: 'audio/pcm;rate=16000', data: btoa(binary) }],
+      },
+    }))
+  }, [])
 
-      // FIX 6: Check readyState explicitly rather than relying on isConnected state
-      const base64 = arrayBufferToBase64(audioData)
-
-      const message = {
-        realtimeInput: {
-          mediaChunks: [
-            {
-              mimeType: 'audio/pcm;rate=16000', // FIX 7: specify sample rate — Gemini requires 16kHz PCM
-              data: base64,
-            },
-          ],
-        },
-      }
-
-      wsRef.current.send(JSON.stringify(message))
-    },
-    [] // No dependency on isConnected — use readyState check instead
-  )
-
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       intentionalCloseRef.current = true
-      if (wsRef.current) {
-        wsRef.current.close(1000, 'Component unmounted')
-        wsRef.current = null
-      }
+      wsRef.current?.close(1000, 'Unmounted')
     }
   }, [])
 
-  return {
-    isConnected,
-    isConnecting,
-    error,
-    connect,
-    disconnect,
-    sendAudio,
-  }
-}
-
-// Helper: convert ArrayBuffer to base64 string
-// Used to encode raw PCM audio before sending over WebSocket
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  let binary = ''
-  const bytes = new Uint8Array(buffer)
-  const len = bytes.byteLength
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i])
-  }
-  return btoa(binary)
+  return { isConnected, isConnecting, error, connect, disconnect, sendAudio }
 }
 
 export default useGeminiLive

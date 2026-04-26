@@ -1,200 +1,148 @@
 'use client'
-
 import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { TopBar } from '@/components/layout/TopBar'
+import { Input } from '@/components/ui/Input'
+import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import { UploadCloud, File, X, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function UploadPage() {
-  const [file, setFile] = useState<File | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [dragActive, setDragActive] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
+  const [file, setFile] = useState<File | null>(null)
+  const [title, setTitle] = useState('')
+  const [subject, setSubject] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true)
-    } else if (e.type === 'dragleave') {
-      setDragActive(false)
+  const handleFile = (f: File) => {
+    if (f.type !== 'application/pdf') {
+      setError('Please upload a valid PDF file.')
+      return
     }
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setDragActive(false)
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const droppedFile = e.dataTransfer.files[0]
-      if (droppedFile.type === 'application/pdf') {
-        setFile(droppedFile)
-        setError(null)
-      } else {
-        setError('Please upload a PDF file')
-      }
+    if (f.size > 20 * 1024 * 1024) {
+      setError('File must be smaller than 20MB.')
+      return
     }
-  }
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault()
-    if (e.target.files && e.target.files[0]) {
-      const selectedFile = e.target.files[0]
-      if (selectedFile.type === 'application/pdf') {
-        setFile(selectedFile)
-        setError(null)
-      } else {
-        setError('Please upload a PDF file')
-      }
+    setFile(f)
+    if (!title) {
+      setTitle(f.name.replace(/\.pdf$/i, ''))
     }
+    setError(null)
   }
 
   const handleUpload = async () => {
     if (!file) return
-
-    setUploading(true)
+    setIsUploading(true)
     setError(null)
 
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('title', title || file.name)
+    formData.append('subject', subject)
 
-      const response = await fetch('/api/upload-pdf', {
+    try {
+      const res = await fetch('/api/upload-pdf', {
         method: 'POST',
         body: formData
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to upload PDF')
-      }
-
-      // Redirect to session page
+      
+      const data = await res.json()
+      
+      if (!res.ok) throw new Error(data.error)
+      
       router.push(`/session/${data.session_id}`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed')
-    } finally {
-      setUploading(false)
+    } catch (err: any) {
+      setError(err.message || 'Upload failed')
+      setIsUploading(false)
     }
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center mb-8">
-          <a href="/" className="text-purple-300 hover:text-white transition-colors">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </a>
-          <h1 className="text-2xl font-bold text-white ml-4">Upload PDF</h1>
-        </div>
-
-        {/* Upload Area */}
-        <div className="max-w-2xl mx-auto">
-          <div
-            className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all ${
-              dragActive 
-                ? 'border-purple-400 bg-purple-500/20' 
-                : 'border-white/20 bg-white/5'
-            } ${file ? 'border-green-400 bg-green-500/10' : ''}`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-          >
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".pdf"
-              onChange={handleChange}
-              className="hidden"
-            />
-
-            {file ? (
-              <div className="space-y-4">
-                <div className="text-6xl">📄</div>
-                <p className="text-white font-medium">{file.name}</p>
-                <p className="text-purple-300 text-sm">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-                <button
-                  onClick={() => {
-                    setFile(null)
-                    if (inputRef.current) inputRef.current.value = ''
-                  }}
-                  className="text-purple-300 hover:text-white text-sm"
-                >
-                  Remove file
-                </button>
+    <div className="flex flex-col h-screen bg-bg-base">
+      <TopBar title="Upload PDF" />
+      
+      <div className="flex-1 max-w-2xl w-full mx-auto p-4 md:p-8 overflow-y-auto">
+        <h1 className="font-display text-3xl font-bold text-text-primary mb-2">Upload Material</h1>
+        <p className="text-text-secondary mb-8">We&apos;ll extract the text and generate your study guide.</p>
+        
+        <Card className="flex flex-col gap-6 p-6">
+          {!file ? (
+            <div 
+              className={cn(
+                "border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center text-center transition-colors cursor-pointer",
+                isDragging ? "border-accent-orange bg-accent-orange/5" : "border-border hover:border-border-subtle hover:bg-bg-elevated/50"
+              )}
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setIsDragging(false)
+                if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0])
+              }}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <div className="h-16 w-16 bg-bg-elevated rounded-full flex items-center justify-center mb-4 text-text-muted">
+                <UploadCloud className="h-8 w-8" />
               </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="text-6xl">📁</div>
-                <p className="text-white text-lg">Drag & drop your PDF here</p>
-                <p className="text-purple-300">or</p>
-                <button
-                  onClick={() => inputRef.current?.click()}
-                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                >
-                  Browse Files
-                </button>
-                <p className="text-purple-400 text-sm mt-4">
-                  Supported format: PDF
-                </p>
+              <h3 className="text-text-primary font-medium mb-1">Click or drag PDF here</h3>
+              <p className="text-text-secondary text-sm">Maximum file size 20MB</p>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept="application/pdf"
+                onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-4 p-4 border border-border rounded-xl bg-bg-elevated">
+              <div className="h-12 w-12 bg-accent-orange/10 text-accent-orange rounded-lg flex items-center justify-center shrink-0">
+                <File className="h-6 w-6" />
               </div>
-            )}
-          </div>
-
-          {/* Error Message */}
-          {error && (
-            <div className="mt-4 p-4 bg-red-500/20 border border-red-400 rounded-lg text-red-200">
-              {error}
+              <div className="flex-1 min-w-0">
+                <p className="text-text-primary font-medium truncate">{file.name}</p>
+                <p className="text-text-secondary text-sm">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+              </div>
+              <button 
+                onClick={() => setFile(null)}
+                className="text-text-muted hover:text-danger p-2"
+                disabled={isUploading}
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
           )}
 
-          {/* Upload Button */}
-          <button
-            onClick={handleUpload}
-            disabled={!file || uploading}
-            className={`w-full mt-6 py-4 rounded-xl font-semibold transition-all ${
-              file && !uploading
-                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:opacity-90'
-                : 'bg-white/10 text-white/50 cursor-not-allowed'
-            }`}
-          >
-            {uploading ? (
-              <span className="flex items-center justify-center">
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Processing PDF...
-              </span>
-            ) : (
-              'Upload & Generate Study Materials'
-            )}
-          </button>
+          {error && <p className="text-danger text-sm">{error}</p>}
 
-          {/* Info */}
-          <div className="mt-8 grid md:grid-cols-3 gap-4 text-center">
-            {[
-              { icon: '📝', title: 'Auto-Summary', desc: '3-sentence overview' },
-              { icon: '🃏', title: 'Flashcards', desc: '8-15 cards generated' },
-              { icon: '❓', title: 'Quiz', desc: '3 practice questions' }
-            ].map((item, i) => (
-              <div key={i} className="bg-white/5 rounded-xl p-4">
-                <div className="text-2xl mb-2">{item.icon}</div>
-                <p className="text-white font-medium text-sm">{item.title}</p>
-                <p className="text-purple-300 text-xs">{item.desc}</p>
-              </div>
-            ))}
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">Title</label>
+              <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Chapter 4: Dynamics" disabled={isUploading} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">Subject (Optional)</label>
+              <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="e.g. Physics 101" disabled={isUploading} />
+            </div>
           </div>
-        </div>
+
+          <Button 
+            className="w-full mt-4" 
+            variant="pdf" 
+            size="lg"
+            disabled={!file || isUploading}
+            onClick={handleUpload}
+          >
+            {isUploading ? (
+              <span className="flex items-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Processing PDF...</span>
+            ) : "Generate Study Guide"}
+          </Button>
+        </Card>
       </div>
-    </main>
+    </div>
   )
 }

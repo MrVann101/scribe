@@ -1,6 +1,3 @@
-// types/api.ts
-// Scribe — API request/response types
-
 export interface CreateSessionRequest {
   title: string
   subject?: string

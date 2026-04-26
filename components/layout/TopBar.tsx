@@ -1,41 +1,15 @@
 'use client'
-
-// components/layout/TopBar.tsx
-// Mobile top bar with back button and title
-
-import { useRouter } from 'next/navigation'
-import { cn } from '@/lib/utils'
 import { ChevronLeft } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
-interface TopBarProps {
-  title: string
-  showBack?: boolean
-  rightAction?: React.ReactNode
-  className?: string
-}
-
-export function TopBar({ title, showBack = true, rightAction, className }: TopBarProps) {
+export function TopBar({ title }: { title: string }) {
   const router = useRouter()
-
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-40 flex h-14 items-center gap-4 border-b border-white/10 bg-surface/95 px-4 md:hidden',
-        className
-      )}
-    >
-      {showBack && (
-        <button
-          onClick={() => router.back()}
-          className="flex items-center justify-center rounded-lg p-1 hover:bg-white/5"
-        >
-          <ChevronLeft className="h-5 w-5 text-white" />
-        </button>
-      )}
-      <h1 className="flex-1 text-lg font-semibold text-white truncate">{title}</h1>
-      {rightAction}
-    </header>
+    <div className="md:hidden flex items-center p-4 border-b border-border bg-bg-surface sticky top-0 z-10">
+      <button onClick={() => router.back()} className="mr-4 text-text-secondary hover:text-text-primary">
+        <ChevronLeft className="h-6 w-6" />
+      </button>
+      <h1 className="font-display text-lg font-medium text-text-primary truncate">{title}</h1>
+    </div>
   )
 }
-
-export default TopBar

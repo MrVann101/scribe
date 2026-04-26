@@ -1,149 +1,110 @@
-// app/api/upload-pdf/route.ts
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { callGeminiWithPDF } from '@/lib/gemini'
+import { NextResponse } from 'next/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { PDF_EXTRACTOR_PROMPT } from '@/lib/prompts'
-import { stripCodeFences } from '@/lib/utils'
 
-export const maxDuration = 60 // Increase timeout for PDF processing
-
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
+  const supabase = createClient()
+  
   try {
-    const supabase = createClient()
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const title = formData.get('title') as string || 'Untitled PDF'
+    const title = formData.get('title') as string
+    const subject = formData.get('subject') as string
 
-    if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      )
+    if (!file || !file.name.endsWith('.pdf')) {
+      return NextResponse.json({ error: 'Valid PDF file required' }, { status: 400 })
     }
 
-    // Validate file type
-    if (file.type !== 'application/pdf') {
-      return NextResponse.json(
-        { error: 'Only PDF files are allowed' },
-        { status: 400 }
-      )
+    if (file.size > 20 * 1024 * 1024) {
+      return NextResponse.json({ error: 'File exceeds 20MB limit' }, { status: 400 })
     }
 
-    // Convert file to base64
-    const base64PDF = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        const result = reader.result as string
-        const base64 = result.includes(',') ? result.split(',')[1] : result
-        resolve(base64)
-      }
-      reader.onerror = reject
-      reader.readAsDataURL(file)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const adminClient = createAdminClient()
+    const { data: session, error: sessionError } = await adminClient.from('sessions').insert({
+      user_id: user.id,
+      title,
+      subject: subject || null,
+      source: 'pdf',
+      status: 'processing',
+      pdf_name: file.name
+    }).select('id').single()
+
+    if (sessionError) throw sessionError
+
+    const sessionId = session.id
+
+    const filePath = `${user.id}/${sessionId}.pdf`
+    const { error: storageError } = await adminClient.storage
+      .from('pdfs')
+      .upload(filePath, file)
+      
+    if (storageError) throw storageError
+
+    const arrayBuffer = await file.arrayBuffer()
+    const base64PDF = Buffer.from(arrayBuffer).toString('base64')
+    
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${process.env.NEXT_PUBLIC_GEMINI_MODEL || 'gemini-2.5-flash'}:generateContent?key=${process.env.NEXT_PUBLIC_GEMINI_API_KEY}`
+    
+    const geminiResponse = await fetch(geminiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: PDF_EXTRACTOR_PROMPT }] },
+        contents: [{
+          role: 'user',
+          parts: [
+            { inline_data: { mime_type: 'application/pdf', data: base64PDF } },
+            { text: 'Please extract and clean the content of this PDF document.' }
+          ]
+        }]
+      })
     })
 
-    // Call Gemini to extract and clean PDF content
-    const cleanedText = await callGeminiWithPDF(
-      PDF_EXTRACTOR_PROMPT,
-      base64PDF,
-      'Please extract and clean the content of this PDF document.'
-    )
-
-    // Create session in Supabase
-    const { data: session, error: sessionError } = await supabase
-      .from('sessions')
-      .insert({
-        source: 'pdf',
-        pdf_name: file.name,
-        title: title,
-        status: 'processing',
-        user_id: '00000000-0000-0000-0000-000000000000'
-      })
-      .select()
-      .single()
-
-    if (sessionError) {
-      console.error('Session creation error:', sessionError)
-      return NextResponse.json(
-        { error: 'Failed to create session' },
-        { status: 500 }
-      )
+    if (!geminiResponse.ok) {
+      const errTxt = await geminiResponse.text()
+      throw new Error(`Gemini PDF extract failed: ${errTxt}`)
     }
 
-    // Split cleaned text into chunks by "Topic:" labels
-    const chunks = cleanedText.split(/(?=Topic:)/g).filter(c => c.trim())
+    const data = await geminiResponse.json()
+    const cleanedText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
 
-    // Save transcript chunks
-    const transcriptInserts = chunks.map((chunk, index) => ({
-      session_id: session.id,
-      text: chunk.trim(),
-      chunk_index: index,
-      source: 'pdf' as const
-    }))
+    const chunks = cleanedText.split(/(?=Topic:)/i).map((c: string) => c.trim()).filter(Boolean)
 
-    const { error: transcriptError } = await supabase
-      .from('transcripts')
-      .insert(transcriptInserts)
+    for (let i = 0; i < chunks.length; i++) {
+      let chunkText = chunks[i]
+      let topicLabel = null
+      
+      const topicMatch = chunkText.match(/^Topic:\s*(.+)/i)
+      if (topicMatch) {
+        topicLabel = topicMatch[1]
+        chunkText = chunkText.replace(/^Topic:\s*(.+)/i, '').trim()
+      }
 
-    if (transcriptError) {
-      console.error('Transcript save error:', transcriptError)
-    }
-
-    // Trigger summarize API (in background)
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/summarize`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        session_id: session.id,
+      await adminClient.from('transcripts').insert({
+        session_id: sessionId,
+        chunk_index: i,
+        text: chunkText,
+        is_alert: chunkText.includes('<alert>'),
+        topic_label: topicLabel,
         source: 'pdf'
       })
-    }).catch(console.error)
-
-    return NextResponse.json({
-      session_id: session.id,
-      page_count: chunks.length
-    })
-      message: 'PDF uploaded successfully. Processing in background.'
-    })
-  } catch (error) {
-    console.error('PDF upload error:', error)
-    return NextResponse.json(
-      { error: 'Failed to process PDF' },
-      { status: 500 }
-    )
-  }
-}
-
-/**
- * Split cleaned text into chunks by Topic: labels
- */
-function splitIntoChunks(text: string): string[] {
-  const lines = text.split('\n')
-  const chunks: string[] = []
-  let currentChunk = ''
-
-  for (const line of lines) {
-    if (line.startsWith('Topic:')) {
-      // Start new chunk
-      if (currentChunk) {
-        chunks.push(currentChunk.trim())
-      }
-      currentChunk = line + '\n'
-    } else {
-      currentChunk += line + '\n'
     }
-  }
 
-  // Add final chunk
-  if (currentChunk) {
-    chunks.push(currentChunk.trim())
-  }
+    await adminClient.from('sessions').update({ pdf_path: filePath, page_count: 0 }).eq('id', sessionId)
 
-  // If no Topic: labels found, return single chunk
-  if (chunks.length === 0 && text.trim()) {
-    return [text.trim()]
-  }
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    fetch(`${appUrl}/api/summarize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId })
+    }).catch(e => console.error("Summary trigger failed:", e))
 
-  return chunks
+    return NextResponse.json({ session_id: sessionId, page_count: 0 })
+  } catch (error: any) {
+    console.error('PDF Upload Error:', error)
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+  }
 }

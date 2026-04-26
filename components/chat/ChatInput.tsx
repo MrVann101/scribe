@@ -1,67 +1,56 @@
-'use client'
-
-// components/chat/ChatInput.tsx
-// Textarea, send on Enter, Shift+Enter for newline
-
-import { useState, type KeyboardEvent, type FormEvent } from 'react'
+import { useState, KeyboardEvent } from 'react'
+import { SendHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Send } from 'lucide-react'
 
 interface ChatInputProps {
   onSend: (message: string) => void
-  isLoading?: boolean
   disabled?: boolean
 }
 
-export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
-  const [message, setMessage] = useState('')
+export function ChatInput({ onSend, disabled }: ChatInputProps) {
+  const [input, setInput] = useState('')
 
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault()
-    if (message.trim() && !isLoading && !disabled) {
-      onSend(message.trim())
-      setMessage('')
-    }
+  const handleSend = () => {
+    if (!input.trim() || disabled) return
+    onSend(input.trim())
+    setInput('')
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSubmit(e)
+      handleSend()
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
-      <textarea
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Ask a question..."
-        disabled={disabled || isLoading}
-        rows={1}
-        className={cn(
-          'flex-1 resize-none rounded-xl border border-white/10 bg-surface/50 px-4 py-3 text-sm text-white',
-          'placeholder:text-gray-500',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
-          'disabled:opacity-50 disabled:cursor-not-allowed',
-          'min-h-[48px] max-h-32'
-        )}
-      />
-      <button
-        type="submit"
-        disabled={disabled || isLoading || !message.trim()}
-        className={cn(
-          'h-auto min-h-[48px] px-4 rounded-xl bg-blue-600 text-white transition-colors',
-          'hover:bg-blue-700',
-          'disabled:opacity-50 disabled:cursor-not-allowed',
-          'flex items-center justify-center'
-        )}
-      >
-        <Send className="h-5 w-5" />
-      </button>
-    </form>
+    <div className="p-4 border-t border-border bg-bg-surface">
+      <div className="relative flex items-end gap-2 rounded-xl border border-border bg-bg-base p-2 focus-within:ring-2 focus-within:ring-accent-blue focus-within:border-transparent transition-all">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Ask a question about this material..."
+          className="max-h-32 min-h-[40px] w-full resize-none bg-transparent px-2 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
+          rows={1}
+          disabled={disabled}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!input.trim() || disabled}
+          className={cn(
+            "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors",
+            input.trim() && !disabled
+              ? "bg-accent-blue text-white hover:bg-accent-blue/90"
+              : "bg-bg-elevated text-text-muted"
+          )}
+        >
+          <SendHorizontal className="h-5 w-5" />
+        </button>
+      </div>
+      <div className="mt-2 text-center text-xs text-text-muted">
+        Press Enter to send, Shift+Enter for new line
+      </div>
+    </div>
   )
 }
-
-export default ChatInput

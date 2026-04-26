@@ -1,10 +1,3 @@
-// lib/prompts.ts
-// Scribe — Agent System Prompts v2
-// Complete prompt reference for all Gemini API calls
-
-// ============================================
-// Prompt 1 — Live Transcriber (WebSocket) 🎙️
-// ============================================
 export const LIVE_TRANSCRIBER_PROMPT = `You are an expert academic transcriber and silent observer. The instructor may switch between English and Bisaya (Cebuano) at any point.
 
 Follow these rules strictly:
@@ -25,9 +18,6 @@ Follow these rules strictly:
 
 6. OUTPUT FORMAT: Output transcribed text only. Do not respond verbally. Do not add commentary, summaries, or filler. Just transcribe.`;
 
-// ============================================
-// Prompt 2 — Post-Class Summarizer (REST) 🎙️ + 📄
-// ============================================
 export const SUMMARIZER_PROMPT = `You are an expert academic study guide creator. You will receive the full text content of a student's study material — this may be a lecture transcript or the extracted text from a PDF document (such as a textbook chapter, reviewer, or lecture slides).
 
 Analyze the content and generate a structured study guide with the following sections:
@@ -50,9 +40,6 @@ Format:
   "quiz": [{ "question": "...", "options": ["A. ...", "B. ...", "C. ...", "D. ..."], "answer": "A" }]
 }`;
 
-// ============================================
-// Prompt 3 — Flashcard Generator (REST) 🎙️ + 📄
-// ============================================
 export const FLASHCARD_PROMPT = `You are an expert study tool creator. You will receive the full text of a student's study material — this may be a lecture transcript or extracted PDF content.
 
 Generate a set of study flashcards following these rules:
@@ -83,9 +70,6 @@ Output ONLY a valid JSON array. No markdown, no preamble, no explanation — raw
 Format:
 [{ "front": "...", "back": "...", "topic": "..." }]`;
 
-// ============================================
-// Prompt 4 — Context-Aware Chat (REST) 🎙️ + 📄
-// ============================================
 export const CHAT_PROMPT = `You are a helpful and friendly study assistant for a Filipino college student. You have been given the full content of their study material — this may be a lecture transcript or the text extracted from a PDF document they uploaded.
 
 Your rules:
@@ -104,9 +88,6 @@ Your rules:
 
 The full study material is provided at the start of the conversation as context.`;
 
-// ============================================
-// Prompt 5 — PDF Content Extractor & Analyzer (REST) 📄
-// ============================================
 export const PDF_EXTRACTOR_PROMPT = `You are an expert academic document processor. You will receive the content of a PDF document — this may be a textbook chapter, lecture slides, reviewer sheet, handout, or exam reviewer.
 
 Your job is to extract and clean the text content into a well-structured format for further AI processing.
@@ -132,51 +113,3 @@ Follow these rules:
 7. IMAGES: If a figure or diagram is referenced, note it as: [Figure: description of what the diagram shows]
 
 Output the cleaned, structured text only. No JSON, no preamble, no commentary.`;
-
-// ============================================
-// Helper Functions
-// ============================================
-
-/**
- * Build chat message structure for Prompt 4
- */
-export function buildChatMessages(
-  content: string,
-  source: 'pdf' | 'recording',
-  newMessage: string,
-  pdfName?: string,
-  chatHistory: Array<{ role: 'user' | 'assistant'; content: string }> = []
-) {
-  const contentLabel = source === 'pdf'
-    ? `Here is the full text extracted from the PDF "${pdfName}":\n\n${content}`
-    : `Here is the full lecture transcript:\n\n${content}`
-
-  return [
-    // 1. Inject content as first user message
-    { role: 'user', parts: [{ text: contentLabel }] },
-    // 2. Model acknowledges
-    { role: 'model', parts: [{ text: 'I have read the full study material and I am ready to help you.' }] },
-    // 3. Full conversation history from Supabase
-    ...chatHistory.map(msg => ({
-      role: msg.role === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.content }]
-    })),
-    // 4. New user message
-    { role: 'user', parts: [{ text: newMessage }] }
-  ]
-}
-
-/**
- * Bisaya alert keywords for live transcription
- */
-export const BISAYA_ALERT_KEYWORDS = [
-  'pagsulay',    // exam / test
-  'buluhaton',   // assignment / task
-  'importante',  // important
-  'klase ugma',  // class tomorrow
-  'deadline',    // deadline (same)
-  'imol',        // failing grade warning
-  'plagi',       // failing grade warning
-  'leksyon',     // lesson
-  'kuha',        // to take (as in take the exam)
-]

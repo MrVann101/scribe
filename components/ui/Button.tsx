@@ -1,7 +1,6 @@
-// components/ui/Button.tsx
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
+import { ButtonHTMLAttributes, ReactNode, forwardRef } from 'react'
 import { cn } from '@/lib/utils'
-import { Loader2 } from 'lucide-react'
+import { Spinner } from './Spinner'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'pdf'
@@ -10,47 +9,39 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon?: ReactNode
 }
 
-const variantStyles = {
-  primary: 'bg-blue-600 hover:bg-blue-700 text-white border-transparent',
-  secondary: 'bg-transparent hover:bg-white/10 text-white border border-white/20',
-  ghost: 'bg-transparent hover:bg-white/5 text-white/80 border-transparent',
-  danger: 'bg-red-600 hover:bg-red-700 text-white border-transparent',
-  pdf: 'bg-orange-600 hover:bg-orange-700 text-white border-transparent',
-}
-
-const sizeStyles = {
-  sm: 'h-8 px-3 text-sm',
-  md: 'h-10 px-4 text-sm',
-  lg: 'h-12 px-6 text-base',
-}
-
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', loading, icon, children, disabled, ...props }, ref) => {
+    const variants = {
+      primary: 'bg-accent-blue text-white hover:opacity-90',
+      secondary: 'bg-bg-elevated border border-border text-text-primary hover:bg-border-subtle',
+      ghost: 'bg-transparent text-text-secondary hover:text-text-primary hover:bg-bg-elevated',
+      danger: 'bg-danger text-white hover:opacity-90',
+      pdf: 'bg-accent-orange text-white hover:opacity-90',
+    }
+
+    const sizes = {
+      sm: 'h-8 px-3 text-xs',
+      md: 'h-10 px-4 text-sm',
+      lg: 'h-12 px-6 text-base',
+    }
+
     return (
       <button
         ref={ref}
+        disabled={disabled || loading}
         className={cn(
-          'inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-          'disabled:opacity-50 disabled:pointer-events-none',
-          variantStyles[variant],
-          sizeStyles[size],
+          'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue disabled:pointer-events-none disabled:opacity-50',
+          variants[variant],
+          sizes[size],
           className
         )}
-        disabled={disabled || loading}
         {...props}
       >
-        {loading ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : icon ? (
-          icon
-        ) : null}
+        {loading && <Spinner className="mr-2 h-4 w-4" />}
+        {!loading && icon && <span className="mr-2">{icon}</span>}
         {children}
       </button>
     )
   }
 )
-
 Button.displayName = 'Button'
-
-export default Button

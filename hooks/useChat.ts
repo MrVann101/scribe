@@ -1,19 +1,8 @@
 'use client'
 
-// hooks/useChat.ts
-// Manages chat message state for a session
-// Loads history from Supabase, sends new messages to /api/chat, saves reply
-
 import { useState, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { ChatMessage as DbChatMessage } from '@/types/database'
-
-export interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  created_at: string
-}
+import { ChatMessage } from '@/types/database'
 
 export interface UseChatReturn {
   messages: ChatMessage[]
@@ -26,137 +15,96 @@ export function useChat(sessionId: string): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
   const supabase = createClient()
 
-  // Fetch existing chat history on mount
   useEffect(() => {
-    const fetchHistory = async () => {
-      setIsLoading(true)
-      try {
-        const { data, error: err } = await supabase
-          .from('chat_messages')
-          .select('*')
-          .eq('session_id', sessionId)
-          .order('created_at', { ascending: true })
+    async function loadHistory() {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true })
 
-        if (err) throw err
-
-        if (data) {
-          setMessages(data.map((msg: DbChatMessage) => ({
-            id: msg.id,
-            role: msg.role,
-            content: msg.content,
-            created_at: msg.created_at,
-          })))
-        }
-      } catch (err) {
-        console.error('[Scribe] Failed to fetch chat history:', err)
+      if (error) {
+        console.error('Failed to load chat history:', error)
         setError('Failed to load chat history')
-      } finally {
-        setIsLoading(false)
+      } else if (data) {
+        setMessages(data as ChatMessage[])
       }
     }
 
     if (sessionId) {
-      fetchHistory()
+      loadHistory()
     }
   }, [sessionId, supabase])
 
-  const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim()) return
+  const sendMessage = useCallback(
+    async (content: string) => {
+      if (!content.trim()) return
 
-    setIsLoading(true)
-    setError(null)
-
-    // Optimistically add user message
-    const tempId = `temp-${Date.now()}`
-    const userMessage: ChatMessage = {
-      id: tempId,
-      role: 'user',
-      content,
-      created_at: new Date().toISOString(),
-    }
-
-    setMessages(prev => [...prev, userMessage])
-
-    try {
-      // Build history for API
-      const history = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      }))
-
-      // Call chat API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: sessionId,
-          message: content,
-          history,
-        }),
-      })
-
-      if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error || 'Failed to get response')
-      }
-
-      const data = await response.json()
-
-      // Save user message to DB
-      const { error: insertErr } = await supabase
-        .from('chat_messages')
-        .insert({
-          session_id: sessionId,
-          role: 'user',
-          content,
-        })
-
-      if (insertErr) {
-        console.error('[Scribe] Failed to save user message:', insertErr)
-      }
-
-      // Add assistant response
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: data.reply,
+      const userMessageId = crypto.randomUUID()
+      const userMessage: ChatMessage = {
+        id: userMessageId,
+        session_id: sessionId,
+        role: 'user',
+        content,
         created_at: new Date().toISOString(),
       }
 
-      setMessages(prev => [...prev, assistantMessage])
+      // Optimistically add user message
+      setMessages((prev) => [...prev, userMessage])
+      setIsLoading(true)
+      setError(null)
 
-      // Save assistant message to DB
-      const { error: insertErr2 } = await supabase
-        .from('chat_messages')
-        .insert({
+      try {
+        // Save user message to DB
+        await supabase.from('chat_messages').insert(userMessage)
+
+        const history = messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        }))
+
+        // Call API
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: sessionId,
+            message: content,
+            history,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to get chat response')
+        }
+
+        const data = await response.json()
+
+        const assistantMessageId = crypto.randomUUID()
+        const assistantMessage: ChatMessage = {
+          id: assistantMessageId,
           session_id: sessionId,
           role: 'assistant',
           content: data.reply,
-        })
+          created_at: new Date().toISOString(),
+        }
 
-      if (insertErr2) {
-        console.error('[Scribe] Failed to save assistant message:', insertErr2)
+        // Save assistant reply to DB
+        await supabase.from('chat_messages').insert(assistantMessage)
+
+        // Add assistant reply to state
+        setMessages((prev) => [...prev, assistantMessage])
+      } catch (err) {
+        console.error('Error sending message:', err)
+        setError('Failed to send message')
+      } finally {
+        setIsLoading(false)
       }
-    } catch (err) {
-      console.error('[Scribe] Chat error:', err)
-      setError(err instanceof Error ? err.message : 'Failed to send message')
-      
-      // Remove optimistic message on error
-      setMessages(prev => prev.filter(m => m.id !== tempId))
-    } finally {
-      setIsLoading(false)
-    }
-  }, [sessionId, messages, supabase])
+    },
+    [sessionId, messages, supabase]
+  )
 
-  return {
-    messages,
-    isLoading,
-    error,
-    sendMessage,
-  }
+  return { messages, isLoading, error, sendMessage }
 }
-
-export default useChat

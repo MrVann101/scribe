@@ -1,6 +1,3 @@
-// types/database.ts
-// Scribe — Database types (matching Supabase tables exactly)
-
 export type SessionSource = 'recording' | 'pdf'
 export type SessionStatus = 'recording' | 'processing' | 'done' | 'error'
 export type MessageRole = 'user' | 'assistant'
