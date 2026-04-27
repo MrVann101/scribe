@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 📚 Scribe
 
-## Getting Started
+> An AI-powered study companion for students — especially those with neurodivergent learning needs.
 
-First, run the development server:
+Scribe turns any lecture recording or PDF into a complete study guide — summary, flashcards, quiz, and chat — powered by Gemini AI. Built in 2.5 days for a hackathon.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## ✨ Main Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 🎙️ Live Recording
+Record your lecture in real time. Scribe transcribes everything automatically and highlights exam alerts and topic shifts as they happen.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 📄 PDF Upload
+Upload any reviewer, handout, or textbook chapter. Scribe extracts the content and generates a full study guide in under 30 seconds.
 
-## Learn More
+### 📚 AI Study Guide
+Every session automatically generates a summary, key concepts, flashcards, and a quiz — ready to study from immediately.
 
-To learn more about Next.js, take a look at the following resources:
+### 💬 Context-Aware Chat
+Ask any question about the lecture or PDF. Scribe answers based only on what was actually taught.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 🔄 Multi-Sensory Mode Switcher
+Switch between four formats depending on how your brain works best:
+- **Mind Map** — visual node graph for visual thinkers
+- **Bionic Reading** — bolds the first letters of each word to help students with dyslexia read faster
+- **Podcast Mode** — reads the summary aloud so students can study while moving
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 🛠️ Tech Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 14 (App Router) + TypeScript |
+| Styling | Tailwind CSS v4 — dark mode |
+| Database | Supabase (PostgreSQL + RLS) |
+| Auth | Supabase Auth — Google OAuth |
+| Storage | Supabase Storage (PDF files) |
+| AI — Live Transcription | Gemini 2.0 Flash Live (WebSocket) |
+| AI — Study Guide + Chat | Gemini 2.5 Flash (REST) |
+| Icons | Lucide React |
+| Fonts | Syne · DM Sans · JetBrains Mono |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+*Scribe — Hackathon 2026 · Tools for Neurodivergent Students · CDO Team*
