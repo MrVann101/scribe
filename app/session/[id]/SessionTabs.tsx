@@ -14,16 +14,16 @@ const TABS: TabProps[] = [
   { id: 'chat', label: 'Chat' },
 ]
 
-export function SessionTabs({ 
-  summaryContent, 
-  flashcardsContent, 
-  quizContent, 
-  chatContent 
-}: { 
-  summaryContent: ReactNode, 
-  flashcardsContent: ReactNode, 
-  quizContent: ReactNode, 
-  chatContent: ReactNode 
+export function SessionTabs({
+  summaryContent,
+  flashcardsContent,
+  quizContent,
+  chatContent
+}: {
+  summaryContent: ReactNode,
+  flashcardsContent: ReactNode,
+  quizContent: ReactNode,
+  chatContent: ReactNode
 }) {
   const [activeTab, setActiveTab] = useState('summary')
 
@@ -36,8 +36,8 @@ export function SessionTabs({
             onClick={() => setActiveTab(tab.id)}
             className={cn(
               "px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
-              activeTab === tab.id 
-                ? "bg-accent-blue text-white" 
+              activeTab === tab.id
+                ? "bg-accent-blue text-white"
                 : "bg-bg-elevated text-text-secondary hover:bg-border-subtle hover:text-text-primary"
             )}
           >
@@ -45,7 +45,7 @@ export function SessionTabs({
           </button>
         ))}
       </div>
-      
+
       <div className="flex-1 animate-in fade-in duration-300">
         {activeTab === 'summary' && summaryContent}
         {activeTab === 'flashcards' && flashcardsContent}

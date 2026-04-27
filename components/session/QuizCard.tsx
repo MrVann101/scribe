@@ -69,9 +69,9 @@ export function QuizCard({ questions }: { questions: QuizQuestion[] | null }) {
               const label = option.charAt(0) // "A", "B", "C", "D"
               const isSelected = selected === label
               const isCorrect = label === question.answer
-              
+
               let optionClass = "bg-bg-base border-border hover:border-accent-blue/50 hover:bg-bg-elevated"
-              
+
               if (selected) {
                 if (isCorrect) {
                   optionClass = "bg-success/10 border-success text-success"
@@ -99,8 +99,8 @@ export function QuizCard({ questions }: { questions: QuizQuestion[] | null }) {
             })}
           </div>
           <div className="mt-6 flex justify-end">
-            <Button 
-              disabled={!selected} 
+            <Button
+              disabled={!selected}
               onClick={handleNext}
               variant={selected ? 'primary' : 'secondary'}
             >
