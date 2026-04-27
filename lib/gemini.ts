@@ -37,7 +37,7 @@ export async function callGemini(
 ): Promise<string> {
   const { apiKey, model } = getConfig()
   const {
-    maxOutputTokens = 2048,  // FIX: cap tokens so Gemini responds faster
+    maxOutputTokens = 4096,  // FIX: cap tokens so Gemini responds faster
     temperature = 0.2,        // FIX: low temp = faster, more consistent JSON
     jsonMode = true,          // FIX: JSON mode skips markdown wrapping
   } = options

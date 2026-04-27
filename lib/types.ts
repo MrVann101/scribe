@@ -144,3 +144,41 @@ export interface GeminiGenerateContentResponse {
     status: string
   }
 }
+
+// ============================================
+// Neurodivergent Features — Types (Prompts 6-9)
+// ============================================
+
+export type SignalType = 'none' | 'low' | 'medium' | 'high' | 'critical'
+export type ImportanceScore = 1 | 2 | 3 | 4 | 5
+
+export interface ImportanceSignal {
+  importance_score: ImportanceScore
+  signal_type: SignalType
+  reason: string
+  keywords: string[]
+}
+
+export interface MindMapNode {
+  id: string
+  label: string
+  type: 'root'
+}
+
+export interface MindMapLeaf {
+  id: string
+  label: string
+  important: boolean
+}
+
+export interface MindMapBranch {
+  id: string
+  label: string
+  color: 'blue' | 'violet' | 'green' | 'amber' | 'orange'
+  leaves: MindMapLeaf[]
+}
+
+export interface MindMapData {
+  central: MindMapNode
+  branches: MindMapBranch[]
+}

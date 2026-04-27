@@ -172,6 +172,11 @@ export default async function SessionPage({
                   <ChatContainer sessionId={params.id} />
                 </div>
               }
+              overview={summary.overview}
+              keyConcepts={summary.key_concepts}
+              actionItems={summary.action_items}
+              quiz={summary.quiz}
+              sessionId={params.id}
             />
           )}
         </div>

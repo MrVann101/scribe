@@ -48,6 +48,68 @@ body {
   backface-visibility: hidden;
 }
 
+/* ============================================================================
+// BIONIC READING STYLES
+// ============================================================================ */
+
+.bionic-text strong.bionic {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.bionic-text p {
+  line-height: 1.9;
+  letter-spacing: 0.02em;
+  font-size: 16px;
+}
+
+/* ============================================================================
+// IMPORTANCE METER STYLES
+// ============================================================================ */
+
+.importance-meter {
+  transition: all 0.3s ease-out;
+}
+
+.importance-meter.none {
+  background-color: var(--text-muted);
+}
+
+.importance-meter.low {
+  background-color: var(--accent-blue);
+  box-shadow: 0 0 8px var(--accent-blue);
+}
+
+.importance-meter.medium {
+  background-color: var(--accent-blue);
+  animation: pulse-medium 2s ease-in-out infinite;
+}
+
+.importance-meter.high {
+  background-color: var(--accent-violet);
+  animation: pulse-high 1.5s ease-in-out infinite;
+}
+
+.importance-meter.critical {
+  background-color: var(--warning);
+  animation: flash-critical 0.5s ease-in-out infinite;
+}
+
+@keyframes pulse-medium {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+
+@keyframes pulse-high {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+@keyframes flash-critical {
+  0%, 100% { opacity: 1; box-shadow: 0 0 20px var(--warning); }
+  50% { opacity: 0.6; box-shadow: 0 0 40px var(--warning); }
+}
+
 .rotate-y-180 {
   transform: rotateY(180deg);
 }
